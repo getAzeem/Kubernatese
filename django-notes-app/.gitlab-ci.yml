@@ -1,0 +1,49 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE_NAME: "$DOCKERHUB_USERNAME/notes-app-k8s"
+  IMAGE_TAG: "$CI_COMMIT_SHORT_SHA"
+
+# -------------------------
+# BUILD & PUSH IMAGE
+# -------------------------
+build_image:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+  only:
+    - main
+
+# -------------------------
+# DEPLOY TO KUBERNETES
+# -------------------------
+deploy_to_k8s:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    # restore kubeconfig
+    - echo "$KUBECONFIG" | base64 -d > kubeconfig
+    - export KUBECONFIG=$PWD/kubeconfig
+
+    # create namespace (idempotent)
+    - kubectl apply -f k8s/namespace.yml
+
+    # update image dynamically
+    - sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_NAME:$IMAGE_TAG|g" k8s/deployment.yml
+
+    # apply k8s manifests
+    - kubectl apply -f k8s/deployment.yml
+    - kubectl apply -f k8s/service.yml
+
+    # verify rollout
+    - kubectl rollout status deployment/notes-app-deployment -n notesapp
+  only:
+    - main
+

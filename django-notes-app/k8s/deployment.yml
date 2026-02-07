@@ -1,0 +1,28 @@
+kind: Deploymenit
+apiVersion: apps/v1
+metadata:
+  name: notes-app-deployment
+  namespace: notesapp
+  labels:
+    app: notesapp
+
+spec:
+
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notes-app-cont
+
+
+  template:
+
+    metadata:
+      labels:
+        app: notes-app-cont
+
+    spec:
+      containers:
+        - name: notes-app
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 8000
